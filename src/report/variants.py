@@ -348,3 +348,67 @@ def comparative_advantage_public_good() -> dict:
         js[i] = p_a[i] * p_b[i]
 
     return {"delta": delta_arr, "p_A": p_a, "p_B": p_b, "joint_survival": js}
+
+
+def summary_table() -> list[tuple[str, float]]:
+    """Compute representative joint survival for each condition."""
+    k = primitives.DEFAULT_K
+    alpha = primitives.DEFAULT_ALPHA
+    rows = []
+
+    # Baseline: 2 symmetric players
+    s = primitives.symmetric_nash(2, k, alpha)
+    p = primitives.alignment_prob(s, k, alpha)
+    rows.append(("Baseline (n=2)", p**2))
+
+    # More actors
+    for n in [3, 5, 10]:
+        s = primitives.symmetric_nash(n, k, alpha)
+        p = primitives.alignment_prob(s, k, alpha)
+        rows.append((f"n={n} actors", p**n))
+
+    # Winner-take-all w=3
+    s = primitives.symmetric_nash(2, k, alpha, w=3.0)
+    p = primitives.alignment_prob(s, k, alpha)
+    rows.append(("Winner-take-all (w=3)", p**2))
+
+    # Comparative advantage (A has 2k)
+    factory = _resource_payoff_factory([0.5, 0.5], [2 * k, k], alpha)
+    s_all = primitives.asymmetric_nash(2, factory)
+    p_a = primitives.alignment_prob(s_all[0], 2 * k, alpha)
+    p_b = primitives.alignment_prob(s_all[1], k, alpha)
+    rows.append(("Comparative adv. (A=2k)", p_a * p_b))
+
+    # Public good (delta=0.3, n=5)
+    s = primitives.symmetric_nash(5, k, alpha, public_good_delta=0.3)
+    eff = s**0.3 * s**0.7  # symmetric: s_avg = s
+    p = primitives.alignment_prob(eff, k, alpha)
+    rows.append(("Public good (n=5, \u03b4=0.3)", p**5))
+
+    # Correlated alignment (rho=0.5)
+    s = primitives.symmetric_nash(2, k, alpha, correlation=0.5)
+    p = primitives.alignment_prob(s, k, alpha)
+    js = primitives.joint_survival_copula([p, p], 0.5)
+    rows.append(("Correlated (\u03c1=0.5)", js))
+
+    # Correlated alignment (rho=0.8)
+    s = primitives.symmetric_nash(2, k, alpha, correlation=0.8)
+    p = primitives.alignment_prob(s, k, alpha)
+    js = primitives.joint_survival_copula([p, p], 0.8)
+    rows.append(("Correlated (\u03c1=0.8)", js))
+
+    # Resource inequality (2 players, 80/20)
+    factory = _resource_payoff_factory([0.8, 0.2], [k, k], alpha)
+    s_all = primitives.asymmetric_nash(2, factory)
+    p1 = primitives.alignment_prob(s_all[0], k, alpha)
+    p2 = primitives.alignment_prob(s_all[1], k, alpha)
+    rows.append(("Unequal resources (80/20)", p1 * p2))
+
+    # Worst case: n=5, w=3
+    s = primitives.symmetric_nash(5, k, alpha, w=3.0)
+    p = primitives.alignment_prob(s, k, alpha)
+    rows.append(("n=5 + WTA (w=3)", p**5))
+
+    # Sort by survival descending
+    rows.sort(key=lambda r: r[1], reverse=True)
+    return rows

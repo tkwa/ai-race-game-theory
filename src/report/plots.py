@@ -275,3 +275,26 @@ def plot_comparative_advantage_public_good(data: dict[str, Any]) -> Figure:
     ax.set_title("Comparative Advantage + Public Good")
     fig.tight_layout()
     return fig
+
+
+def plot_summary_table(rows: list[tuple[str, float]]) -> Figure:
+    """Colored summary table of survival probabilities across conditions."""
+    labels = [r[0] for r in rows]
+    values = [r[1] for r in rows]
+
+    fig, ax = plt.subplots(figsize=(8, len(rows) * 0.45 + 0.8))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, len(rows))
+    ax.axis("off")
+
+    cmap = plt.cm.RdYlGn
+    for i, (label, val) in enumerate(zip(labels, values)):
+        y = len(rows) - 1 - i
+        color = cmap(val)
+        ax.barh(y, val, height=0.7, color=color, edgecolor="white", linewidth=0.5)
+        ax.text(-0.01, y, label, ha="right", va="center", fontsize=9, fontweight="bold")
+        ax.text(val + 0.01, y, f"{val:.0%}", ha="left", va="center", fontsize=9)
+
+    ax.set_title("Joint Survival Probability by Condition", fontsize=12, fontweight="bold", pad=10)
+    fig.tight_layout()
+    return fig
