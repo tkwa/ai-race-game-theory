@@ -88,6 +88,52 @@ def plot_full_model_vs_k(data: dict) -> Figure:
     return fig
 
 
+def plot_lab_summary(data: dict) -> Figure:
+    """Clustered bar graph: per-lab Omega share (black) and P(misalignment) (red)."""
+    names = data["lab_names"]
+    omega = data["omega_share"]
+    p_mis = data["p_misaligned"]
+    n = len(names)
+    x = np.arange(n)
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars1 = ax.bar(x - width / 2, omega, width, color="black", label="Power share (Ω | aligned)")
+    bars2 = ax.bar(x + width / 2, p_mis, width, color="#d62728", label="P(misalignment)")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(names, fontsize=11)
+    ax.set_ylabel("Probability / Share")
+    ax.set_title("Baseline Equilibrium: Lab Power Share and Misalignment Risk")
+    ax.legend()
+    ax.set_ylim(0, max(max(omega), max(p_mis)) * 1.2)
+
+    # Annotate bars
+    for bar in bars1:
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.008,
+            f"{bar.get_height():.1%}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+    for bar in bars2:
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.008,
+            f"{bar.get_height():.1%}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            color="#d62728",
+        )
+
+    fig.tight_layout()
+    fig.savefig("plots/lab_summary.png", dpi=150, bbox_inches="tight")
+    return fig
+
+
 def plot_interventions(results: list[tuple[str, float, float]]) -> Figure:
     """Horizontal bar graph of intervention effects relative to baseline."""
     names = [r[0] for r in results]

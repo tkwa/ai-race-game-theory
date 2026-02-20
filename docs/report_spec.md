@@ -8,7 +8,7 @@
     - $A_{ii} = 1$, so a lab gets payout 1 if its own aligned AI dominates the future.
 - Post-singularity power $\Omega_i$ is split between labs proportional to $c_i^w$
   - $w$ determines how winner-take-all the AI race is. At $w=0$ all labs get an equal share regardless of capabilities investment, and $w=\infty$ the winner gets 100% of the lightcone
-- Alignment probability of lab i goes as $1/(1 + \frac{c_i}{k S_i^\epsilon})
+- Alignment probability of lab i goes as $1/(1 + \frac{c_i}{k S_i^\epsilon})$
   - $S_i := \left( \sum_j s_j \right)^\delta s_i^{1-\delta}$ is the company's effective safety level
   - $k$ tracks the ease of safety
   - $\epsilon$ tracks the elasticity of safety output to safety investment; whether there are diminishing or increasing returns.
@@ -63,6 +63,7 @@ The `report.ipynb` should be an internal report with the following sections:
 - "Full model" section explaining the model above
   - Explain that "Survival probability" can be instead interpreted as "expected human share" in multipolar post-ASI futures.
   - Plot for outcomes vs k, with default value of $\epsilon$ and all other params
+  - Clustered bar graph showing, for each lab, their AI's share | alignment in black, and their AI's p(misalignment) in red
   - Table for interventions. Should be a bar graph of survival probability relative to the default case (shown as a vertical line). Both the absolute and relative probabilities for each case should be printed.
     - Remove China
     - Remove Anthropic
