@@ -33,4 +33,6 @@ PARAM_RANGES = {
     "delta": (0.0, 0.5, 0.75),
     "rho": (0.0, 0.5, 1.0),
     "z": (0.5, 1.0, 1.0),
+    "china_r": (0.05, 0.15, 0.25),
+    "amity_scale": (0.67, 1.0, 2.0),  # <1 dilates away from 1, >1 shrinks toward 1
 }

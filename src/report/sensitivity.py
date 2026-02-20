@@ -1,12 +1,57 @@
 """Monte Carlo sensitivity analysis over game-theoretic parameters."""
 
+import multiprocessing
+
 import numpy as np
 
 from report import defaults, primitives
 
 
-def run_sensitivity(n_samples: int = 500, seed: int = 42) -> dict:
-    """Run Monte Carlo sensitivity analysis over w, δ, ρ, z.
+def _compute_one_sample(params: dict) -> float:
+    """Compute Nash equilibrium and expected human share for one parameter vector."""
+    R = np.array(params["R"])
+    A = np.array(params["A"])
+    s_nash = primitives.full_model_nash(
+        R=R,
+        A=A,
+        k=defaults.K,
+        alpha=defaults.ALPHA,
+        w=params["w"],
+        z=params["z"],
+        delta=params["delta"],
+        rho=params["rho"],
+    )
+    return primitives.expected_human_share(
+        s_all=s_nash,
+        R=R,
+        k=defaults.K,
+        alpha=defaults.ALPHA,
+        w=params["w"],
+        z=params["z"],
+        delta=params["delta"],
+        rho=params["rho"],
+    )
+
+
+def _make_R(china_r: float) -> np.ndarray:
+    """Build resource vector with given China share, rescaling US labs proportionally."""
+    us_total = 1.0 - china_r
+    us_base = defaults.R[:4]
+    R = np.empty(5)
+    R[:4] = us_base * (us_total / us_base.sum())
+    R[4] = china_r
+    return R
+
+
+def _make_A(amity_scale: float) -> np.ndarray:
+    """Scale off-diagonal amity: >1 shrinks toward 1, <1 dilates away from 1."""
+    off_diag = defaults.A - np.eye(len(defaults.A))
+    scaled = off_diag * amity_scale
+    return scaled + np.eye(len(defaults.A))
+
+
+def run_sensitivity(n_samples: int = 500, seed: int = 42, n_workers: int | None = None) -> dict:
+    """Run Monte Carlo sensitivity analysis over w, δ, ρ, z, China R, amity scale.
 
     Samples parameters from triangular distributions, computes Nash
     equilibrium and expected human share for each, then buckets by
@@ -19,12 +64,18 @@ def run_sensitivity(n_samples: int = 500, seed: int = 42) -> dict:
     delta_range = defaults.PARAM_RANGES["delta"]
     rho_range = defaults.PARAM_RANGES["rho"]
     z_range = defaults.PARAM_RANGES["z"]
+    china_r_range = defaults.PARAM_RANGES["china_r"]
+    amity_range = defaults.PARAM_RANGES["amity_scale"]
 
     # Sample from triangular distributions
     w_samples = np.random.triangular(w_range[0], w_range[1], w_range[2], n_samples)
     delta_samples = np.random.triangular(delta_range[0], delta_range[1], delta_range[2], n_samples)
     rho_samples = np.random.triangular(rho_range[0], rho_range[1], rho_range[2], n_samples)
     z_samples = np.random.triangular(z_range[0], z_range[1], z_range[2], n_samples)
+    china_r_samples = np.random.triangular(
+        china_r_range[0], china_r_range[1], china_r_range[2], n_samples
+    )
+    amity_samples = np.random.triangular(amity_range[0], amity_range[1], amity_range[2], n_samples)
 
     params_list = [
         {
@@ -32,37 +83,19 @@ def run_sensitivity(n_samples: int = 500, seed: int = 42) -> dict:
             "delta": float(delta_samples[i]),
             "rho": float(rho_samples[i]),
             "z": float(z_samples[i]),
+            "R": _make_R(float(china_r_samples[i])).tolist(),
+            "A": _make_A(float(amity_samples[i])).tolist(),
+            "china_r": float(china_r_samples[i]),
+            "amity_scale": float(amity_samples[i]),
         }
         for i in range(n_samples)
     ]
 
-    # Compute expected human share for each parameter vector
-    human_shares = []
-    for i, params in enumerate(params_list):
-        if (i + 1) % 50 == 0:
-            print(f"  Computed {i + 1}/{n_samples} samples")
-
-        s_nash = primitives.full_model_nash(
-            R=defaults.R,
-            A=defaults.A,
-            k=defaults.K,
-            alpha=defaults.ALPHA,
-            w=params["w"],
-            z=params["z"],
-            delta=params["delta"],
-            rho=params["rho"],
-        )
-        human_share = primitives.expected_human_share(
-            s_all=s_nash,
-            R=defaults.R,
-            k=defaults.K,
-            alpha=defaults.ALPHA,
-            w=params["w"],
-            z=params["z"],
-            delta=params["delta"],
-            rho=params["rho"],
-        )
-        human_shares.append(human_share)
+    # Parallel computation across CPU cores
+    if n_workers is None:
+        n_workers = min(multiprocessing.cpu_count(), 8)
+    with multiprocessing.Pool(n_workers) as pool:
+        human_shares = pool.map(_compute_one_sample, params_list)
 
     # Bucket each parameter into deciles and compute conditional medians
     w_buckets, w_medians = compute_median_by_buckets(list(w_samples), human_shares, n_buckets=10)
@@ -73,12 +106,20 @@ def run_sensitivity(n_samples: int = 500, seed: int = 42) -> dict:
         list(rho_samples), human_shares, n_buckets=10
     )
     z_buckets, z_medians = compute_median_by_buckets(list(z_samples), human_shares, n_buckets=10)
+    china_buckets, china_medians = compute_median_by_buckets(
+        list(china_r_samples), human_shares, n_buckets=10
+    )
+    # Compute average off-diagonal amity for labeling
+    amity_avgs = [float(np.mean(_make_A(s)[~np.eye(5, dtype=bool)])) for s in amity_samples]
+    amity_buckets, amity_medians = compute_median_by_buckets(amity_avgs, human_shares, n_buckets=10)
 
     variables = [
         (w_buckets, w_medians, "w", "Winner-Take-All Exponent (w)"),
         (delta_buckets, delta_medians, "δ", "Public Good Parameter (δ)"),
         (rho_buckets, rho_medians, "ρ", "Alignment Correlation (ρ)"),
         (z_buckets, z_medians, "z", "Misaligned AI Power Advantage (z)"),
+        (china_buckets, china_medians, "China R", "China's Resource Share"),
+        (amity_buckets, amity_medians, "Avg amity", "Average Amity (off-diagonal)"),
     ]
 
     return {

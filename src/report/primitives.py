@@ -4,7 +4,7 @@ import functools
 
 import numpy as np
 import scipy.optimize as optimize
-import scipy.stats as stats
+import scipy.special as special
 
 # Calibrated so that 1% spending -> 80% aligned, 50% spending -> 98% aligned
 DEFAULT_K = 33.9
@@ -123,7 +123,7 @@ def joint_survival_copula(probs: list[float], rho: float) -> float:
             result *= p
         return result
 
-    z = np.array([stats.norm.ppf(np.clip(p, 1e-10, 1.0 - 1e-10)) for p in probs])
+    z = special.ndtri(np.clip(probs, 1e-10, 1.0 - 1e-10))
     sqrt_rho = np.sqrt(rho)
     sqrt_1mrho = np.sqrt(1.0 - rho)
 
@@ -134,7 +134,7 @@ def joint_survival_copula(probs: list[float], rho: float) -> float:
 
     # Vectorized: (n_nodes, n_probs) -> product over probs -> dot with weights
     args = (z[np.newaxis, :] - sqrt_rho * t_vals[:, np.newaxis]) / sqrt_1mrho
-    conditional = np.prod(stats.norm.cdf(args), axis=1)
+    conditional = np.prod(special.ndtr(args), axis=1)
     result = np.dot(w_vals, conditional)
     return float(np.clip(result, 0.0, 1.0))
 
@@ -150,6 +150,15 @@ def _gauss_hermite_cached(n: int) -> tuple[np.ndarray, np.ndarray]:
 # ---------------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=8)
+def _alignment_mask(n: int) -> np.ndarray:
+    """Cached (2^n, n) boolean matrix where bit j of index encodes alignment."""
+    n_outcomes = 1 << n
+    indices = np.arange(n_outcomes)[:, np.newaxis]
+    bits = np.arange(n)[np.newaxis, :]
+    return ((indices >> bits) & 1).astype(bool)
+
+
 def _outcome_probabilities(probs: np.ndarray, rho: float) -> np.ndarray:
     """Compute P(outcome) for all 2^n alignment outcome vectors.
 
@@ -157,20 +166,15 @@ def _outcome_probabilities(probs: np.ndarray, rho: float) -> np.ndarray:
     (bit j set = lab j aligned).
     """
     n = len(probs)
-    n_outcomes = 1 << n
+    aligned = _alignment_mask(n)
 
     if rho <= 0:
-        # Independent case: fast direct computation
-        result = np.empty(n_outcomes)
-        for idx in range(n_outcomes):
-            p = 1.0
-            for j in range(n):
-                p *= probs[j] if (idx >> j) & 1 else (1.0 - probs[j])
-            result[idx] = p
-        return result
+        # Independent: product of p_j or (1-p_j) per outcome
+        per_lab = np.where(aligned, probs, 1.0 - probs)  # (2^n, n)
+        return np.prod(per_lab, axis=1)
 
-    # Gaussian copula via Gauss-Hermite quadrature over common factor
-    z_vals = np.array([stats.norm.ppf(np.clip(p, 1e-10, 1.0 - 1e-10)) for p in probs])
+    # Gaussian copula via Gauss-Hermite quadrature
+    z_vals = special.ndtri(np.clip(probs, 1e-10, 1.0 - 1e-10))
     sqrt_rho = np.sqrt(rho)
     sqrt_1mrho = np.sqrt(1.0 - rho)
 
@@ -178,21 +182,18 @@ def _outcome_probabilities(probs: np.ndarray, rho: float) -> np.ndarray:
     t_vals = nodes * np.sqrt(2)
     w_vals = weights / np.sqrt(np.pi)
 
-    # Conditional alignment probs at each quadrature point: (n_nodes, n_labs)
-    cond_p = stats.norm.cdf((z_vals[np.newaxis, :] - sqrt_rho * t_vals[:, np.newaxis]) / sqrt_1mrho)
+    # Conditional probs: (n_nodes, n_labs)
+    cond_p = special.ndtr((z_vals[np.newaxis, :] - sqrt_rho * t_vals[:, np.newaxis]) / sqrt_1mrho)
     cond_q = 1.0 - cond_p
 
-    # Compute all 2^n outcome probs via quadrature
-    result = np.zeros(n_outcomes)
-    for idx in range(n_outcomes):
-        # Product of p_j(t) or q_j(t) for each lab, at each quadrature point
-        prod = np.ones(len(t_vals))
-        for j in range(n):
-            if (idx >> j) & 1:
-                prod *= cond_p[:, j]
-            else:
-                prod *= cond_q[:, j]
-        result[idx] = np.dot(w_vals, prod)
+    # Vectorized: select p or q per outcome per lab, then product over labs
+    # aligned: (2^n, n) -> (1, 2^n, n); cond_p: (n_nodes, 1, n)
+    per_lab = np.where(
+        aligned[np.newaxis, :, :], cond_p[:, np.newaxis, :], cond_q[:, np.newaxis, :]
+    )
+    # (n_nodes, 2^n)
+    prod = np.prod(per_lab, axis=2)
+    result = w_vals @ prod  # (2^n,)
 
     return np.clip(result, 0.0, 1.0)
 
@@ -218,16 +219,12 @@ def _precompute_omega_table(
     - aligned_masks: (2^n, n) boolean alignment masks
     """
     n = len(abs_cap)
-    n_outcomes = 1 << n
 
     # Precompute per-lab values for both aligned and misaligned
     cap_aligned = abs_cap**w
     cap_misaligned = abs_cap ** (w * (1.0 - z))
 
-    # Build alignment mask matrix: (2^n, n)
-    indices = np.arange(n_outcomes)[:, np.newaxis]
-    bits = np.arange(n)[np.newaxis, :]
-    aligned_masks = ((indices >> bits) & 1).astype(bool)
+    aligned_masks = _alignment_mask(n)
 
     # Compute raw omega: select aligned or misaligned capability per lab
     omega_raw = np.where(aligned_masks, cap_aligned, cap_misaligned)
@@ -306,10 +303,12 @@ def full_model_nash(
     rho: float = 0.0,
     initial_guess: list[float] | None = None,
     fixed: dict[int, float] | None = None,
+    min_safety: dict[int, float] | None = None,
 ) -> list[float]:
     """Find Nash equilibrium for the full model via iterated best response.
 
     fixed: dict mapping lab index -> fixed safety fraction (not optimized).
+    min_safety: dict mapping lab index -> minimum safety fraction (constrained optimization).
     """
     n = len(R)
     s_all = list(initial_guess) if initial_guess else [0.3] * n
@@ -324,6 +323,8 @@ def full_model_nash(
             if fixed and i in fixed:
                 continue
 
+            lo = min_safety[i] if (min_safety and i in min_safety) else 1e-10
+
             def neg_payoff(s_i: float, _i: int = i) -> float:
                 s_trial = list(s_all)
                 s_trial[_i] = s_i
@@ -331,7 +332,7 @@ def full_model_nash(
                 return -payoffs[_i]
 
             result = optimize.minimize_scalar(
-                neg_payoff, bounds=(1e-10, 1.0 - 1e-10), method="bounded"
+                neg_payoff, bounds=(lo, 1.0 - 1e-10), method="bounded"
             )
             s_all[i] = damping * s_prev[i] + (1.0 - damping) * result.x
 

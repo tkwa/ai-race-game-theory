@@ -122,8 +122,11 @@ def plot_interventions(results: list[tuple[str, float, float]]) -> Figure:
 
 
 def plot_sensitivity(data: dict) -> Figure:
-    """2x2 grid of conditional median expected human share vs each parameter."""
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    """Grid of conditional median expected human share vs each parameter."""
+    n_vars = len(data["variables"])
+    ncols = 3
+    nrows = (n_vars + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 4.5 * nrows))
 
     for ax, (centers, medians, xlabel, title) in zip(axes.flat, data["variables"]):
         ax.plot(centers, medians, "o-", linewidth=2, markersize=8, color="steelblue")
@@ -131,11 +134,16 @@ def plot_sensitivity(data: dict) -> Figure:
         ax.set_ylabel("Median expected human share", fontsize=10)
         ax.set_title(f"Conditional on {title}", fontsize=11)
         ax.grid(True, alpha=0.3)
+        ax.yaxis.set_major_locator(plt.MultipleLocator(0.02))
         if medians:
             y_range = max(medians) - min(medians)
             ax.set_ylim(
                 min(medians) - max(0.02, y_range * 0.1), max(medians) + max(0.02, y_range * 0.1)
             )
+
+    # Hide unused axes
+    for ax in axes.flat[n_vars:]:
+        ax.set_visible(False)
 
     fig.suptitle("Sensitivity Analysis", fontsize=14)
     fig.tight_layout()
