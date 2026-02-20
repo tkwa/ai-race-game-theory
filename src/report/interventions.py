@@ -250,9 +250,10 @@ def _intervention_public_good() -> float:
     )
 
 
-def _intervention_tell_everyone_gdm_safe(baseline_nash: list[float]) -> float:
+def _intervention_tell_everyone_gdm_safe() -> float:
     """Everyone knows GDM is safe; all re-optimize. GDM fixed at alignment=1."""
-    # GDM (index 2) is fixed safe, others re-optimize knowing this
+    # GDM (index 2) is fixed safe and spends 0 on safety; others re-optimize
+    # knowing GDM is guaranteed aligned (override_probs visible during Nash)
     s_star = primitives.full_model_nash(
         R=defaults.R,
         A=defaults.A,
@@ -263,6 +264,7 @@ def _intervention_tell_everyone_gdm_safe(baseline_nash: list[float]) -> float:
         delta=defaults.DELTA,
         rho=defaults.RHO,
         fixed={2: 0.0},
+        override_probs={2: 1.0},
     )
     return expected_human_share_with_overrides(
         s_all=s_star,
@@ -437,6 +439,35 @@ def _intervention_min_safety_10pct() -> float:
     )
 
 
+def _intervention_gdm_zero_amity() -> float:
+    """Set GDM's amity towards every other lab to 0."""
+    A_new = defaults.A.copy()
+    gdm = 2
+    for j in range(len(defaults.R)):
+        if j != gdm:
+            A_new[gdm, j] = 0.0
+    s_star = primitives.full_model_nash(
+        R=defaults.R,
+        A=A_new,
+        k=defaults.K,
+        alpha=defaults.ALPHA,
+        w=defaults.W,
+        z=defaults.Z,
+        delta=defaults.DELTA,
+        rho=defaults.RHO,
+    )
+    return primitives.expected_human_share(
+        s_all=s_star,
+        R=defaults.R,
+        k=defaults.K,
+        alpha=defaults.ALPHA,
+        w=defaults.W,
+        z=defaults.Z,
+        delta=defaults.DELTA,
+        rho=defaults.RHO,
+    )
+
+
 def compute_interventions() -> list[tuple[str, float, float]]:
     """Compute (name, baseline_human_share, intervention_human_share) for each intervention."""
     return _compute_all()
@@ -463,7 +494,7 @@ def _compute_all() -> list[tuple[str, float, float]]:
         (
             "Make GDM 100% safe, tell everyone",
             baseline_ehs,
-            _intervention_tell_everyone_gdm_safe(baseline_nash),
+            _intervention_tell_everyone_gdm_safe(),
         ),
         ("Double GDM's resources", baseline_ehs, _intervention_double_gdm_resources()),
         ("Increase amity 10% toward 1", baseline_ehs, _intervention_increase_amity()),
@@ -477,4 +508,5 @@ def _compute_all() -> list[tuple[str, float, float]]:
             _intervention_usg_slowdown(baseline_nash),
         ),
         ("USG mandates ≥10% safety", baseline_ehs, _intervention_min_safety_10pct()),
+        ("GDM amity → 0 to all others", baseline_ehs, _intervention_gdm_zero_amity()),
     ]

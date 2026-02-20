@@ -245,11 +245,15 @@ def full_model_payoffs(
     z: float,
     delta: float | None = None,
     rho: float = 0.0,
+    override_probs: dict[int, float] | None = None,
 ) -> np.ndarray:
     """Compute expected payoff for each lab under the full Ω model."""
     n = len(s_all)
     eff_s = _effective_safety(s_all, delta)
     probs = np.array([alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    if override_probs:
+        for idx, p in override_probs.items():
+            probs[idx] = p
     abs_cap = np.array([R[j] * max(1.0 - s_all[j], 1e-15) for j in range(n)])
 
     outcome_probs = _outcome_probabilities(probs, rho)
@@ -304,11 +308,13 @@ def full_model_nash(
     initial_guess: list[float] | None = None,
     fixed: dict[int, float] | None = None,
     min_safety: dict[int, float] | None = None,
+    override_probs: dict[int, float] | None = None,
 ) -> list[float]:
     """Find Nash equilibrium for the full model via iterated best response.
 
     fixed: dict mapping lab index -> fixed safety fraction (not optimized).
     min_safety: dict mapping lab index -> minimum safety fraction (constrained optimization).
+    override_probs: dict mapping lab index -> forced alignment probability (known to all).
     """
     n = len(R)
     s_all = list(initial_guess) if initial_guess else [0.3] * n
@@ -328,7 +334,9 @@ def full_model_nash(
             def neg_payoff(s_i: float, _i: int = i) -> float:
                 s_trial = list(s_all)
                 s_trial[_i] = s_i
-                payoffs = full_model_payoffs(s_trial, R, A, k, alpha, w, z, delta, rho)
+                payoffs = full_model_payoffs(
+                    s_trial, R, A, k, alpha, w, z, delta, rho, override_probs
+                )
                 return -payoffs[_i]
 
             result = optimize.minimize_scalar(

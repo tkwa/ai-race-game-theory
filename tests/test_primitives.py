@@ -1,5 +1,6 @@
 """Tests for report primitives against baseline model and calibration targets."""
 
+import numpy as np
 import pytest
 
 from ai_race_game_theory import model
@@ -103,6 +104,59 @@ def _effective_spread(s_all: list[float], delta: float) -> float:
     """Max minus min of effective safety."""
     eff = primitives._effective_safety(s_all, delta)
     return max(eff) - min(eff)
+
+
+class TestOverrideProbs:
+    """Tests for override_probs in full_model_nash and full_model_payoffs."""
+
+    def _simple_params(self) -> dict:
+        """Small 3-lab setup for fast tests."""
+        return dict(
+            R=np.array([0.4, 0.3, 0.3]),
+            A=np.array([[1.0, 0.5, 0.5], [0.5, 1.0, 0.5], [0.5, 0.5, 1.0]]),
+            k=33.9,
+            alpha=0.466,
+            w=2.0,
+            z=1.0,
+            delta=0.5,
+            rho=0.0,
+        )
+
+    def test_known_safe_lab_changes_others_safety(self) -> None:
+        """override_probs during Nash should change other labs' equilibrium strategies.
+
+        Without override_probs, fixing lab 0 at s=0 makes it look dangerous
+        (alignment_prob=0), so others give up on safety (misaligned lab 0 dominates
+        the omega share regardless). With override_probs={0: 1.0}, others know lab 0
+        is safe, making alignment more valuable — so they invest MORE in safety.
+        """
+        params = self._simple_params()
+
+        # Old (buggy) approach: fixed s=0 but no override during Nash
+        s_without = primitives.full_model_nash(**params, fixed={0: 0.0})
+
+        # Correct approach: fixed s=0 AND override alignment prob during Nash
+        s_with = primitives.full_model_nash(**params, fixed={0: 0.0}, override_probs={0: 1.0})
+
+        # Others invest MORE in safety when they know lab 0 is guaranteed aligned
+        avg_safety_without = np.mean([s_without[1], s_without[2]])
+        avg_safety_with = np.mean([s_with[1], s_with[2]])
+        assert avg_safety_with > avg_safety_without
+
+    def test_override_probs_affects_payoffs(self) -> None:
+        """Overriding a lab's alignment prob to 1.0 should change payoffs vs s=0 default."""
+        params = self._simple_params()
+        s_all = [0.0, 0.3, 0.3]
+
+        payoffs_no_override = primitives.full_model_payoffs(s_all, **params)
+        payoffs_with_override = primitives.full_model_payoffs(
+            s_all, **params, override_probs={0: 1.0}
+        )
+
+        # With lab 0 guaranteed aligned, the other labs' payoffs should increase
+        # (they benefit from lab 0's alignment via amity > 0)
+        assert payoffs_with_override[1] > payoffs_no_override[1]
+        assert payoffs_with_override[2] > payoffs_no_override[2]
 
 
 class TestCopula:

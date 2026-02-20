@@ -76,6 +76,7 @@ The `report.ipynb` should be an internal report with the following sections:
     - Increase US -> China amity to China -> US levels
     - USG demands slowdown: forcibly reduce the capabilities investment of all the US labs by 33%; keep absolute safety level the same; China adapts
     - USG demands safety investment: Labs must spend at least 10% on safety
+    - Set GDM's amity towards every other lab to 0
   - Sensitivity analysis
     - Similar graph format to [takeoff model](https://github.com/tkwa/ai-takeoff-model/). Sample from distributions of parameters, vary one at a time, subplots of expected human win% marginalized on each parameter with a range.
     - To allow easy comparison, y axis grid lines should be 0.02 in each subplot.
