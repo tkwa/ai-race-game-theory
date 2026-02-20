@@ -29,13 +29,10 @@ We assume there is no cooperation, and labs maximize expected utility, so we wan
 
 ### Parameter values
 
-Parameters are derived from these assumptions:
+- $R$ and $A$ use Tao's estimates (see `docs/tao_params.md`). R = [OAI: 0.27, Ant: 0.27, GDM: 0.27, xAI: 0.09, China: 0.10]. See `docs/parameters.md` for Claude's earlier estimates and Tao's rationale for the changes.
 
-- $R$: Claude should choose weights for the resource vector $R$ that reflect the lab's share of current resources, taking into account compute and months behind the frontier of their best models as of Feb 2026.
-  - For the sensitivity analysis, alter China's resources to be in [0.05, 0.25], rescaling the rest to add up to 1.
-- $A$: Claude should choose weights for the amity matrix A that reflect the likely decision-making of actors based on all public information. The best approximation of each lab should include the attitudes of lab executives, employees, and government, with more weight given to more dominant influences.
-  - US labs should have average amity 0 towards China (reflecting the high salience of competitive influences in US decision-making), but China should have higher amity towards the US.
-  - For the sensitivity analysis, shrink the off-diagonal entries towards 1 by up to 2x or dilate them away by up to 1.5x (making some negative). The label should be average amity [not counting diagonal ofc]
+- $R$: For the sensitivity analysis, alter China's resources to be in [0.05, 0.25], rescaling the rest to add up to 1.
+- $A$: For the sensitivity analysis, shrink the off-diagonal entries towards 1 by up to 2x or dilate them away by up to 1.5x (making some negative). The label should be average amity [not counting diagonal ofc]
 - $w$: 2.0 by default, range [1.0, 5.0]
 - $k$, $\epsilon$: set them such that 1% spending -> 20% misalignment, 50% spending -> 2% misalignment. Doesn't make sense to vary because these are different worldviews.
 - $\delta$: 0.5 by default, range [0, 0.75]

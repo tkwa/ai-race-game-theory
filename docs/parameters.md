@@ -48,3 +48,38 @@ China     0.3   0.3   0.3   0.2    1
 - **US-China amity**: Could argue US labs should have small positive amity toward China (0.05-0.1) if you weight safety researchers' views. Kept at 0 per spec to reflect dominant competitive framing.
 - **xAI's amity**: Musk is volatile. Could be higher (0.3-0.4) if you think his competitive rhetoric doesn't reflect actual preferences. Could be even lower if you take the zero-sum framing literally.
 - **Anthropic's amity toward China**: Most uncertain entry. 0.1 reflects a weak safety-motivated preference; could be 0 if competitive pressures dominate internally.
+
+---
+
+## Addendum: Tao's parameter estimates (adopted)
+
+The model now uses Tao's estimates for R and A, which differ from Claude's initial estimates above.
+
+### Resources R
+
+| Player | Claude | Tao | Rationale for change |
+|--------|--------|-----|---------------------|
+| OAI | 0.25 | 0.27 | Slightly higher — co-frontier status |
+| Ant | 0.15 | 0.27 | Significantly higher — near-frontier models, high talent retention, strong cloud commitments |
+| GDM | 0.30 | 0.27 | Slightly lower — equalized with OAI and Ant |
+| xAI | 0.15 | 0.09 | Much lower — large GPU cluster but significantly behind frontier |
+| China | 0.15 | 0.10 | Lower — hardware constraints dominate algorithmic efficiency gains |
+
+Key difference: Tao equalizes the big three (OAI, Ant, GDM) at 0.27 each, reflecting that Anthropic's models are now at or near frontier despite lower raw compute. xAI is demoted more aggressively based on model quality lag.
+
+### Amity matrix A
+
+```
+          OAI   Ant   GDM   xAI   China
+OAI        1    0.20  0.20  0.15   0      (lower than Claude's 0.4 across the board)
+Ant       0.45   1    0.60  0.30   0.10   (similar to Claude's, slightly lower OAI amity)
+GDM       0.50  0.65   1    0.40   0.10   (higher Ant amity — GDM owns some Anthropic equity)
+xAI       0.20  0.20  0.20   1    -0.20   (negative China amity — actively adversarial)
+China     0.30  0.30  0.30  0.20   1       (unchanged)
+```
+
+Key differences from Claude's estimates:
+- **OAI amity much lower** (0.15-0.20 vs 0.3-0.4): Tao sees OAI as more zero-sum / competitive than Claude estimated.
+- **GDM→Ant high** (0.65 vs 0.4): Reflects Google's equity stake in Anthropic — financial alignment.
+- **GDM→China nonzero** (0.10 vs 0.0): Slight positive amity.
+- **xAI→China negative** (-0.20 vs 0.0): Musk actively adversarial toward China, not just indifferent.
