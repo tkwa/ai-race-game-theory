@@ -32,8 +32,10 @@ We assume there is no cooperation, and labs maximize expected utility, so we wan
 Parameters are derived from these assumptions:
 
 - $R$: Claude should choose weights for the resource vector $R$ that reflect the lab's share of current resources, taking into account compute and months behind the frontier of their best models as of Feb 2026.
+  - For the sensitivity analysis, alter China's resources to be in [0.05, 0.25], rescaling the rest to add up to 1.
 - $A$: Claude should choose weights for the amity matrix A that reflect the likely decision-making of actors based on all public information. The best approximation of each lab should include the attitudes of lab executives, employees, and government, with more weight given to more dominant influences.
   - US labs should have average amity 0 towards China (reflecting the high salience of competitive influences in US decision-making), but China should have higher amity towards the US.
+  - For the sensitivity analysis, shrink the off-diagonal entries towards 1 by up to 2x or dilate them away by up to 1.5x (making some negative). The label should be average amity [not counting diagonal ofc]
 - $w$: 2.0 by default, range [1.0, 5.0]
 - $k$, $\epsilon$: set them such that 1% spending -> 20% misalignment, 50% spending -> 2% misalignment. Doesn't make sense to vary because these are different worldviews.
 - $\delta$: 0.5 by default, range [0, 0.75]
@@ -63,15 +65,23 @@ The `report.ipynb` should be an internal report with the following sections:
   - Plot for outcomes vs k, with default value of $\epsilon$ and all other params
   - Table for interventions. Should be a bar graph of survival probability relative to the default case (shown as a vertical line). Both the absolute and relative probabilities for each case should be printed.
     - Remove China
+    - Remove Anthropic
     - Duplicate every lab
     - Secretly make the largest lab 100% safe
     - Make the largest lab 100% safe, and tell only them
+    - Make the largest lab 100% safe, and tell everyone
     - Double the largest lab's resources
     - Increase amity 10% of the way towards 1
     - Make safety a public good ($\delta = 1$)
-  - 
+    - Make the top 3 labs have mutual amity 1
+    - Merge the top 3 labs (amity towards remaining labs set to average of the 3 rows)
+    - Increase US -> China amity to China -> US levels
+    - USG demands slowdown: forcibly reduce the capabilities investment of all the US labs by 33%; keep absolute safety level the same; China adapts
+    - USG demands safety investment: Labs must spend at least 10% on safety
+- force all US lab safety spending to be over 5%
   - Sensitivity analysis
     - Similar graph format to [takeoff model](https://github.com/tkwa/ai-takeoff-model/). Sample from distributions of parameters, vary one at a time, subplots of expected human win% marginalized on each parameter with a range.
+    - To allow easy comparison, y axis grid lines should be 0.02 in each subplot.
 
 There should also be the following appendices:
 - A writeup of methodology behind Claude's parameter choices
