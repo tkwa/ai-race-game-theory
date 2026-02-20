@@ -1,0 +1,16 @@
+- tao’s guess at params
+    - resources
+        - xAI 0.09
+        - Ant 0.27
+        - China 0.1
+        - GDM 0.27
+        - OAI 0.27
+    - amity
+        - Ant
+            - 0.45, 1, 0.6, 0.3, 0.1
+        - xAI → China -0.2
+        - OAI
+            - 0.2 0.2 0.15 0 towards other labs
+        - GDM
+            - 0.5, 0.65, 0.4, 0.1 towards other labs
+            - GDM owns some of anthropic apparently
