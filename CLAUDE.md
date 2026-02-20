@@ -4,7 +4,12 @@ Game-theoretic model of AI safety race dynamics between competing nations.
 
 ## Project Structure
 
+
 - `docs/` - Model descriptions and write-ups
+  - `docs/report_spec.md` contains the spec that the report should follow, including the model definition.
+- `README.md` - Will ultimately be the external output of this project, a blog post.
+- `report.ipynb` - The internal output of this project.
+- `src/report/` - Code used in report.ipynb
 - `src/ai_race_game_theory/` - Core model and analysis code
 - `tests/` - pytest tests
 - `plots/` - Generated plots

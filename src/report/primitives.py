@@ -1,5 +1,7 @@
 """Core primitives for game-theoretic AI safety variants."""
 
+import functools
+
 import numpy as np
 import scipy.optimize as optimize
 import scipy.stats as stats
@@ -109,7 +111,11 @@ def asymmetric_nash(
 
 
 def joint_survival_copula(probs: list[float], rho: float) -> float:
-    """Joint survival via Gaussian copula with equicorrelation ρ."""
+    """Joint survival via Gaussian copula with equicorrelation ρ.
+
+    Uses the factorization X_i = √ρ·Z + √(1-ρ)·ε_i to reduce the
+    n-dimensional CDF to 1D quadrature over the common factor Z.
+    """
     n = len(probs)
     if rho <= 0 or n == 1:
         result = 1.0
@@ -117,18 +123,23 @@ def joint_survival_copula(probs: list[float], rho: float) -> float:
             result *= p
         return result
 
-    # Clamp to avoid infinities in Φ⁻¹
     z = np.array([stats.norm.ppf(np.clip(p, 1e-10, 1.0 - 1e-10)) for p in probs])
+    sqrt_rho = np.sqrt(rho)
+    sqrt_1mrho = np.sqrt(1.0 - rho)
 
-    # Equicorrelation matrix
-    cov = np.full((n, n), rho)
-    np.fill_diagonal(cov, 1.0)
+    # Gauss-Hermite quadrature: ∫f(t)φ(t)dt = ∫f(t√2)exp(-t²)dt/√π
+    nodes, weights = _gauss_hermite_cached(32)
+    t_vals = nodes * np.sqrt(2)  # transform to standard normal
+    w_vals = weights / np.sqrt(np.pi)
 
-    try:
-        return float(stats.multivariate_normal.cdf(z, mean=np.zeros(n), cov=cov))
-    except Exception:
-        # Fallback for numerical issues
-        result = 1.0
-        for p in probs:
-            result *= p
-        return result
+    # Vectorized: (n_nodes, n_probs) -> product over probs -> dot with weights
+    args = (z[np.newaxis, :] - sqrt_rho * t_vals[:, np.newaxis]) / sqrt_1mrho
+    conditional = np.prod(stats.norm.cdf(args), axis=1)
+    result = np.dot(w_vals, conditional)
+    return float(np.clip(result, 0.0, 1.0))
+
+
+@functools.lru_cache(maxsize=8)
+def _gauss_hermite_cached(n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Cached Gauss-Hermite quadrature nodes and weights."""
+    return np.polynomial.hermite.hermgauss(n)
