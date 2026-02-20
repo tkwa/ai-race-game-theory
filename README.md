@@ -18,6 +18,8 @@ TODO better description, outline
 
 - Interventions
 
+### What if we're probably doomed?
+
 ## Discussion
 
 ## Appendices (written by Claude)

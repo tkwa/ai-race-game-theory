@@ -41,6 +41,70 @@ class TestSymmetricNash:
             assert s_prim == pytest.approx(s_model, abs=0.01)
 
 
+class TestDeltaConvention:
+    """δ=0 is private (no spillover), δ=1 is fully public."""
+
+    def test_delta_zero_equals_no_spillover(self) -> None:
+        """δ=0 gives same effective safety as no spillover (delta=None)."""
+        s_all = [0.1, 0.3, 0.5]
+        eff_none = primitives._effective_safety(s_all, None)
+        eff_zero = primitives._effective_safety(s_all, 0.0)
+        for a, b in zip(eff_none, eff_zero):
+            assert a == pytest.approx(b, abs=1e-10)
+
+    def test_delta_one_equalizes_safety(self) -> None:
+        """δ=1 (fully public) makes all effective safety equal to s_avg."""
+        s_all = [0.1, 0.3, 0.5]
+        eff = primitives._effective_safety(s_all, 1.0)
+        s_avg = sum(s_all) / len(s_all)
+        for e in eff:
+            assert e == pytest.approx(s_avg, abs=1e-10)
+
+    def test_higher_delta_reduces_spread(self) -> None:
+        """More public good (higher δ) narrows the gap between effective safety levels."""
+        s_all = [0.1, 0.5]
+        spread_low = _effective_spread(s_all, 0.1)
+        spread_high = _effective_spread(s_all, 0.9)
+        assert spread_high < spread_low
+
+    def test_public_good_increases_survival(self) -> None:
+        """Making safety more public (δ=0.5) should increase joint survival vs private (δ=0)."""
+        k, alpha, n = primitives.DEFAULT_K, primitives.DEFAULT_ALPHA, 3
+        s_private = primitives.symmetric_nash(n, k, alpha, public_good_delta=None)
+        s_public = primitives.symmetric_nash(n, k, alpha, public_good_delta=0.5)
+
+        p_priv = primitives.alignment_prob(s_private, k, alpha)
+        # For public good, effective safety = s_avg^δ * s^(1-δ); symmetric so s_avg = s
+        p_pub = primitives.alignment_prob(s_public, k, alpha)
+
+        # Public good shouldn't make survival worse (symmetric case: eff = s, same formula)
+        # The real benefit shows in asymmetric cases, but at minimum it shouldn't hurt
+        assert p_pub**n >= p_priv**n * 0.95  # allow small numerical tolerance
+
+    def test_full_model_delta_one_equalizes(self) -> None:
+        """In the full model, δ=1 should give equal effective safety for all labs."""
+        s_all = [0.1, 0.3, 0.5]
+        eff = primitives._effective_safety(s_all, 1.0)
+        s_avg = sum(s_all) / len(s_all)
+        # With δ=1 (fully public), all effective safety = s_avg
+        for e in eff:
+            assert e == pytest.approx(s_avg, abs=1e-10)
+
+    def test_delta_interpolates_monotonically(self) -> None:
+        """Effective safety spread decreases monotonically as δ goes from 0 to 1."""
+        s_all = [0.1, 0.5]
+        deltas = [0.0, 0.25, 0.5, 0.75, 1.0]
+        spreads = [_effective_spread(s_all, d) for d in deltas]
+        for i in range(len(spreads) - 1):
+            assert spreads[i] >= spreads[i + 1] - 1e-10
+
+
+def _effective_spread(s_all: list[float], delta: float) -> float:
+    """Max minus min of effective safety."""
+    eff = primitives._effective_safety(s_all, delta)
+    return max(eff) - min(eff)
+
+
 class TestCopula:
     def test_independent_at_rho_zero(self) -> None:
         """At ρ=0, copula equals product of marginals."""

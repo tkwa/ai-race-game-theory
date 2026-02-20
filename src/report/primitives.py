@@ -39,8 +39,8 @@ def symmetric_nash(
             # Effective safety for alignment calc
             if public_good_delta is not None:
                 s_avg = ((n - 1) * s_j + s_i) / n
-                eff_i = s_i**public_good_delta * s_avg ** (1.0 - public_good_delta)
-                eff_j = s_j**public_good_delta * s_avg ** (1.0 - public_good_delta)
+                eff_i = s_avg**public_good_delta * s_i ** (1.0 - public_good_delta)
+                eff_j = s_avg**public_good_delta * s_j ** (1.0 - public_good_delta)
             else:
                 eff_i = s_i
                 eff_j = s_j
@@ -143,3 +143,200 @@ def joint_survival_copula(probs: list[float], rho: float) -> float:
 def _gauss_hermite_cached(n: int) -> tuple[np.ndarray, np.ndarray]:
     """Cached Gauss-Hermite quadrature nodes and weights."""
     return np.polynomial.hermite.hermgauss(n)
+
+
+# ---------------------------------------------------------------------------
+# Full model with Ω, Ã, z
+# ---------------------------------------------------------------------------
+
+
+def _outcome_probabilities(probs: np.ndarray, rho: float) -> np.ndarray:
+    """Compute P(outcome) for all 2^n alignment outcome vectors.
+
+    Returns array of shape (2^n,) where index bits encode alignment
+    (bit j set = lab j aligned).
+    """
+    n = len(probs)
+    n_outcomes = 1 << n
+
+    if rho <= 0:
+        # Independent case: fast direct computation
+        result = np.empty(n_outcomes)
+        for idx in range(n_outcomes):
+            p = 1.0
+            for j in range(n):
+                p *= probs[j] if (idx >> j) & 1 else (1.0 - probs[j])
+            result[idx] = p
+        return result
+
+    # Gaussian copula via Gauss-Hermite quadrature over common factor
+    z_vals = np.array([stats.norm.ppf(np.clip(p, 1e-10, 1.0 - 1e-10)) for p in probs])
+    sqrt_rho = np.sqrt(rho)
+    sqrt_1mrho = np.sqrt(1.0 - rho)
+
+    nodes, weights = _gauss_hermite_cached(32)
+    t_vals = nodes * np.sqrt(2)
+    w_vals = weights / np.sqrt(np.pi)
+
+    # Conditional alignment probs at each quadrature point: (n_nodes, n_labs)
+    cond_p = stats.norm.cdf((z_vals[np.newaxis, :] - sqrt_rho * t_vals[:, np.newaxis]) / sqrt_1mrho)
+    cond_q = 1.0 - cond_p
+
+    # Compute all 2^n outcome probs via quadrature
+    result = np.zeros(n_outcomes)
+    for idx in range(n_outcomes):
+        # Product of p_j(t) or q_j(t) for each lab, at each quadrature point
+        prod = np.ones(len(t_vals))
+        for j in range(n):
+            if (idx >> j) & 1:
+                prod *= cond_p[:, j]
+            else:
+                prod *= cond_q[:, j]
+        result[idx] = np.dot(w_vals, prod)
+
+    return np.clip(result, 0.0, 1.0)
+
+
+def _effective_safety(s_all: list[float], delta: float | None) -> list[float]:
+    """Compute effective safety levels with optional public-good spillover."""
+    if delta is None or delta <= 0:
+        return list(s_all)
+    n = len(s_all)
+    s_avg = sum(s_all) / n
+    if s_avg <= 0:
+        return [0.0] * n
+    return [s_avg**delta * s ** (1.0 - delta) for s in s_all]
+
+
+def _precompute_omega_table(
+    abs_cap: np.ndarray, w: float, z: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Precompute Ω and aligned masks for all 2^n outcomes.
+
+    Returns (omega_table, aligned_masks) where:
+    - omega_table: (2^n, n) normalized Ω values
+    - aligned_masks: (2^n, n) boolean alignment masks
+    """
+    n = len(abs_cap)
+    n_outcomes = 1 << n
+
+    # Precompute per-lab values for both aligned and misaligned
+    cap_aligned = abs_cap**w
+    cap_misaligned = abs_cap ** (w * (1.0 - z))
+
+    # Build alignment mask matrix: (2^n, n)
+    indices = np.arange(n_outcomes)[:, np.newaxis]
+    bits = np.arange(n)[np.newaxis, :]
+    aligned_masks = ((indices >> bits) & 1).astype(bool)
+
+    # Compute raw omega: select aligned or misaligned capability per lab
+    omega_raw = np.where(aligned_masks, cap_aligned, cap_misaligned)
+    totals = omega_raw.sum(axis=1, keepdims=True)
+    totals = np.maximum(totals, 1e-30)
+    omega_table = omega_raw / totals
+
+    return omega_table, aligned_masks
+
+
+def full_model_payoffs(
+    s_all: list[float],
+    R: np.ndarray,
+    A: np.ndarray,
+    k: float,
+    alpha: float,
+    w: float,
+    z: float,
+    delta: float | None = None,
+    rho: float = 0.0,
+) -> np.ndarray:
+    """Compute expected payoff for each lab under the full Ω model."""
+    n = len(s_all)
+    eff_s = _effective_safety(s_all, delta)
+    probs = np.array([alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    abs_cap = np.array([R[j] * max(1.0 - s_all[j], 1e-15) for j in range(n)])
+
+    outcome_probs = _outcome_probabilities(probs, rho)
+    omega_table, aligned_masks = _precompute_omega_table(abs_cap, w, z)
+
+    # Ã_ij = A_ij if j aligned, 0 otherwise
+    # payoff_i = Σ_outcome P(outcome) * Σ_j Ω_j * Ã_ij
+    #          = Σ_outcome P(outcome) * Σ_j [Ω_j * A_ij * aligned_j]
+    # Vectorized: (2^n, n) * (2^n,1) -> weighted by outcome probs
+    # For each outcome: value_i = Σ_j omega[j] * A[i,j] * aligned[j]
+    #                            = (omega * aligned) @ A.T  row i
+    masked_omega = omega_table * aligned_masks  # (2^n, n): Ω_j if aligned, 0 otherwise
+    # (2^n, n) @ (n, n) -> (2^n, n): payoff contribution per outcome per lab
+    outcome_payoffs = masked_omega @ A.T
+    # Weight by outcome probabilities
+    return outcome_probs @ outcome_payoffs  # (n,)
+
+
+def expected_human_share(
+    s_all: list[float],
+    R: np.ndarray,
+    k: float,
+    alpha: float,
+    w: float,
+    z: float,
+    delta: float | None = None,
+    rho: float = 0.0,
+) -> float:
+    """Expected fraction of universe controlled by aligned AI."""
+    n = len(s_all)
+    eff_s = _effective_safety(s_all, delta)
+    probs = np.array([alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    abs_cap = np.array([R[j] * max(1.0 - s_all[j], 1e-15) for j in range(n)])
+
+    outcome_probs = _outcome_probabilities(probs, rho)
+    omega_table, aligned_masks = _precompute_omega_table(abs_cap, w, z)
+
+    # Aligned share per outcome = sum of Ω_j for aligned labs
+    aligned_shares = (omega_table * aligned_masks).sum(axis=1)  # (2^n,)
+    return float(outcome_probs @ aligned_shares)
+
+
+def full_model_nash(
+    R: np.ndarray,
+    A: np.ndarray,
+    k: float,
+    alpha: float,
+    w: float,
+    z: float,
+    delta: float | None = None,
+    rho: float = 0.0,
+    initial_guess: list[float] | None = None,
+    fixed: dict[int, float] | None = None,
+) -> list[float]:
+    """Find Nash equilibrium for the full model via iterated best response.
+
+    fixed: dict mapping lab index -> fixed safety fraction (not optimized).
+    """
+    n = len(R)
+    s_all = list(initial_guess) if initial_guess else [0.3] * n
+    if fixed:
+        for idx, val in fixed.items():
+            s_all[idx] = val
+    damping = 0.5
+
+    for _ in range(300):
+        s_prev = list(s_all)
+        for i in range(n):
+            if fixed and i in fixed:
+                continue
+
+            def neg_payoff(s_i: float, _i: int = i) -> float:
+                s_trial = list(s_all)
+                s_trial[_i] = s_i
+                payoffs = full_model_payoffs(s_trial, R, A, k, alpha, w, z, delta, rho)
+                return -payoffs[_i]
+
+            result = optimize.minimize_scalar(
+                neg_payoff, bounds=(1e-10, 1.0 - 1e-10), method="bounded"
+            )
+            s_all[i] = damping * s_prev[i] + (1.0 - damping) * result.x
+
+        max_change = max(abs(s_all[j] - s_prev[j]) for j in range(n))
+        if max_change < 1e-7:
+            break
+
+    return s_all

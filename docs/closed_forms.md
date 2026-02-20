@@ -123,7 +123,9 @@ The sum telescopes to exactly $P'(s^*)$ — the $\delta$ terms cancel. Therefore
 
 **Intuition:** In the symmetric equilibrium, increasing your safety by $ds$ improves your own effective safety and (via the public good) everyone else's. But the total marginal effect on all alignment probabilities sums to the same value regardless of how the benefit is split between private and public channels.
 
-**Caveat:** This only holds for the symmetric case with $\alpha = 1$. For $\alpha \ne 1$, the chain rule introduces $\alpha \hat{s}^{\alpha-1}$ factors that break the telescoping, so $\delta$ matters. It also matters in asymmetric equilibria.
+**Caveat:** This holds for ALL symmetric equilibria, not just $\alpha = 1$. The cancellation depends only on $\sum_j d\hat{s}_j/ds_i = 1$ (a property of the effective safety function) and on all actors having the same $P'/P$ (a consequence of symmetry). Both hold for any $\alpha$.
+
+However, $\delta$ **does** matter in asymmetric equilibria — actors with different resources or $k$ values have different $P'/P$, so redistributing marginal benefit across actors changes the total effect on joint survival. Specifically, public-good spillovers help by raising the alignment probability of the weakest actor (who bottlenecks joint survival).
 
 ## 3. General $\alpha$ — no closed form
 
@@ -184,7 +186,7 @@ The FOC involves $\partial \Phi_n / \partial p_i$, which can be expressed via th
 | Case | Closed form? | Reference |
 |------|:---:|---|
 | Symmetric, $\alpha=1$, any $n$, any $w$ | **Yes** — quadratic in $p$ | Section 1 |
-| + public good $\delta$ (symmetric, $\alpha=1$) | **Same** — $\delta$ drops out | Section 2 |
+| + public good $\delta$ (symmetric, any $\alpha$) | **Same** — $\delta$ drops out | Section 2 |
 | General $\alpha$ | No — transcendental | Section 3 |
 | Asymmetric resources ($\alpha=1$) | In principle, but degree 4+ | Section 4 |
 | Asymmetric $k$ ($\alpha=1$) | In principle, but high-degree system | Section 5 |

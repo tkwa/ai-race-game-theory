@@ -69,6 +69,7 @@ The `report.ipynb` should be an internal report with the following sections:
     - Double the largest lab's resources
     - Increase amity 10% of the way towards 1
     - Make safety a public good ($\delta = 1$)
+  - 
   - Sensitivity analysis
     - Similar graph format to [takeoff model](https://github.com/tkwa/ai-takeoff-model/). Sample from distributions of parameters, vary one at a time, subplots of expected human win% marginalized on each parameter with a range.
 

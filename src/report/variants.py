@@ -66,7 +66,7 @@ def _resource_payoff_factory(
             # Effective safety with optional public-good spillover
             if public_good_delta is not None:
                 s_avg = sum(s_vec) / n
-                eff = [sj**public_good_delta * s_avg ** (1.0 - public_good_delta) for sj in s_vec]
+                eff = [s_avg**public_good_delta * sj ** (1.0 - public_good_delta) for sj in s_vec]
             else:
                 eff = list(s_vec)
 
@@ -175,11 +175,11 @@ def public_good_safety() -> dict:
 
     for i, delta in enumerate(delta_arr):
         d = float(delta)
-        # delta=0 means fully public, delta=1 means fully private
+        # delta=0 means fully private, delta=1 means fully public
         s = primitives.symmetric_nash(n, k, alpha, public_good_delta=d if d > 0 else 1e-10)
         s_star[i] = s
         s_avg = s  # symmetric: all play s*
-        eff_s = s**d * s_avg ** (1.0 - d) if d > 0 else s_avg
+        eff_s = s_avg**d * s ** (1.0 - d) if d > 0 else s
         p = primitives.alignment_prob(eff_s, k, alpha)
         js[i] = p**n
 
@@ -269,7 +269,7 @@ def public_good_vs_correlation() -> dict:
             d = float(delta) if float(delta) > 0 else 1e-10
             s = primitives.symmetric_nash(2, k, alpha, public_good_delta=d, correlation=float(rho))
             s_avg = s  # symmetric
-            eff_s = s**d * s_avg ** (1.0 - d)
+            eff_s = s_avg**d * s ** (1.0 - d)
             p = primitives.alignment_prob(eff_s, k, alpha)
             js[i, j] = primitives.joint_survival_copula([p, p], float(rho))
 
@@ -341,8 +341,8 @@ def comparative_advantage_public_good() -> dict:
         s_all = primitives.asymmetric_nash(n, factory)
 
         s_avg = sum(s_all) / n
-        eff_a = s_all[0] ** d * s_avg ** (1.0 - d)
-        eff_b = s_all[1] ** d * s_avg ** (1.0 - d)
+        eff_a = s_avg**d * s_all[0] ** (1.0 - d)
+        eff_b = s_avg**d * s_all[1] ** (1.0 - d)
         p_a[i] = primitives.alignment_prob(eff_a, k_a, alpha)
         p_b[i] = primitives.alignment_prob(eff_b, k_b, alpha)
         js[i] = p_a[i] * p_b[i]
