@@ -26,14 +26,14 @@ ALPHA = 0.466
 W = 2.0  # Winner-take-all exponent
 DELTA = 0.5  # Public good parameter
 RHO = 0.5  # Alignment correlation
-Z = 1.0  # Misaligned AI power advantage
+Z = 0.9  # Misaligned AI power advantage
 
 # Sensitivity analysis: triangular distributions (min, mode, max)
 PARAM_RANGES = {
     "w": (1.0, 2.0, 5.0),
     "delta": (0.0, 0.5, 0.75),
     "rho": (0.0, 0.5, 1.0),
-    "z": (0.5, 1.0, 1.0),
+    "z": (0.5, 0.9, 1.0),
     "china_r": (0.05, 0.10, 0.25),
     "amity_scale": (0.67, 1.0, 2.0),  # <1 dilates away from 1, >1 shrinks toward 1
 }

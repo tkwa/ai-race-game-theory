@@ -38,9 +38,9 @@ def symmetric_nash(
         def neg_payoff(s_i: float) -> float:
             # Effective safety for alignment calc
             if public_good_delta is not None:
-                s_avg = ((n - 1) * s_j + s_i) / n
-                eff_i = s_avg**public_good_delta * s_i ** (1.0 - public_good_delta)
-                eff_j = s_avg**public_good_delta * s_j ** (1.0 - public_good_delta)
+                s_sum = (n - 1) * s_j + s_i
+                eff_i = s_sum**public_good_delta * s_i ** (1.0 - public_good_delta)
+                eff_j = s_sum**public_good_delta * s_j ** (1.0 - public_good_delta)
             else:
                 eff_i = s_i
                 eff_j = s_j
@@ -106,6 +106,8 @@ def asymmetric_nash(
 
         if max(abs(s_all[j] - s_prev[j]) for j in range(n)) < 1e-8:
             break
+    else:
+        raise RuntimeError("asymmetric_nash did not converge after 200 iterations")
 
     return s_all
 
@@ -202,11 +204,10 @@ def _effective_safety(s_all: list[float], delta: float | None) -> list[float]:
     """Compute effective safety levels with optional public-good spillover."""
     if delta is None or delta <= 0:
         return list(s_all)
-    n = len(s_all)
-    s_avg = sum(s_all) / n
-    if s_avg <= 0:
-        return [0.0] * n
-    return [s_avg**delta * s ** (1.0 - delta) for s in s_all]
+    s_sum = sum(s_all)
+    if s_sum <= 0:
+        return [0.0] * len(s_all)
+    return [s_sum**delta * s ** (1.0 - delta) for s in s_all]
 
 
 def _precompute_omega_table(
@@ -321,9 +322,9 @@ def full_model_nash(
     if fixed:
         for idx, val in fixed.items():
             s_all[idx] = val
-    damping = 0.5
+    damping = 0.7
 
-    for _ in range(300):
+    for iteration in range(1000):
         s_prev = list(s_all)
         for i in range(n):
             if fixed and i in fixed:
@@ -345,7 +346,9 @@ def full_model_nash(
             s_all[i] = damping * s_prev[i] + (1.0 - damping) * result.x
 
         max_change = max(abs(s_all[j] - s_prev[j]) for j in range(n))
-        if max_change < 1e-7:
+        if max_change < 5e-6:
             break
+    else:
+        raise RuntimeError("full_model_nash did not converge after 1000 iterations")
 
     return s_all

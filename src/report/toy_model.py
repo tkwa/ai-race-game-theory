@@ -38,3 +38,58 @@ def toy_n_actors() -> dict:
         joint_survival[i] = p ** int(n)
 
     return {"n": n_arr, "s_star": s_star, "joint_survival": joint_survival}
+
+
+def _resource_payoff_factory(
+    resources: list[float],
+    k_values: list[float],
+    alpha: float,
+) -> callable:
+    """Return a payoff_fn_factory for asymmetric_nash with heterogeneous resources and k."""
+    n = len(resources)
+
+    def factory(i: int, s_all: list[float]) -> callable:
+        def payoff(s_i: float) -> float:
+            s_vec = list(s_all)
+            s_vec[i] = s_i
+
+            probs = [primitives.alignment_prob(s_vec[j], k_values[j], alpha) for j in range(n)]
+            joint = 1.0
+            for p in probs:
+                joint *= p
+
+            caps = [resources[j] * max(1.0 - s_vec[j], 1e-15) for j in range(n)]
+            total_cap = sum(caps)
+            share = caps[i] / total_cap if total_cap > 0 else 0.0
+
+            return joint * 100.0 * share
+
+        return payoff
+
+    return factory
+
+
+def toy_asymmetric_resources() -> dict:
+    """Safety spending and joint survival vs resource ratio for 2 asymmetric players."""
+    r_arr = np.linspace(0.5, 0.95, 50)
+    s1 = np.empty(50)
+    s2 = np.empty(50)
+    p1 = np.empty(50)
+    p2 = np.empty(50)
+    js = np.empty(50)
+
+    k = primitives.DEFAULT_K
+    alpha = primitives.DEFAULT_ALPHA
+
+    for i, r in enumerate(r_arr):
+        resources = [float(r), 1.0 - float(r)]
+        k_values = [k, k]
+        factory = _resource_payoff_factory(resources, k_values, alpha)
+        s_all = primitives.asymmetric_nash(2, factory)
+        s1[i] = s_all[0]
+        s2[i] = s_all[1]
+        p1[i] = primitives.alignment_prob(s_all[0], k, alpha)
+        p2[i] = primitives.alignment_prob(s_all[1], k, alpha)
+        js[i] = p1[i] * p2[i]
+
+    return {"R": r_arr, "s1": s1, "s2": s2, "p1": p1, "p2": p2, "joint_survival": js}

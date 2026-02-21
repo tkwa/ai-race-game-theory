@@ -54,12 +54,12 @@ class TestDeltaConvention:
             assert a == pytest.approx(b, abs=1e-10)
 
     def test_delta_one_equalizes_safety(self) -> None:
-        """δ=1 (fully public) makes all effective safety equal to s_avg."""
+        """δ=1 (fully public) makes all effective safety equal to Σ s_j."""
         s_all = [0.1, 0.3, 0.5]
         eff = primitives._effective_safety(s_all, 1.0)
-        s_avg = sum(s_all) / len(s_all)
+        s_sum = sum(s_all)
         for e in eff:
-            assert e == pytest.approx(s_avg, abs=1e-10)
+            assert e == pytest.approx(s_sum, abs=1e-10)
 
     def test_higher_delta_reduces_spread(self) -> None:
         """More public good (higher δ) narrows the gap between effective safety levels."""
@@ -75,21 +75,20 @@ class TestDeltaConvention:
         s_public = primitives.symmetric_nash(n, k, alpha, public_good_delta=0.5)
 
         p_priv = primitives.alignment_prob(s_private, k, alpha)
-        # For public good, effective safety = s_avg^δ * s^(1-δ); symmetric so s_avg = s
-        p_pub = primitives.alignment_prob(s_public, k, alpha)
+        # With s_sum formula, eff_s = (n*s)^δ * s^(1-δ) = n^δ * s, so δ helps
+        eff_pub = (n * s_public) ** 0.5 * s_public**0.5
+        p_pub = primitives.alignment_prob(eff_pub, k, alpha)
 
-        # Public good shouldn't make survival worse (symmetric case: eff = s, same formula)
-        # The real benefit shows in asymmetric cases, but at minimum it shouldn't hurt
-        assert p_pub**n >= p_priv**n * 0.95  # allow small numerical tolerance
+        assert p_pub**n > p_priv**n
 
     def test_full_model_delta_one_equalizes(self) -> None:
         """In the full model, δ=1 should give equal effective safety for all labs."""
         s_all = [0.1, 0.3, 0.5]
         eff = primitives._effective_safety(s_all, 1.0)
-        s_avg = sum(s_all) / len(s_all)
-        # With δ=1 (fully public), all effective safety = s_avg
+        s_sum = sum(s_all)
+        # With δ=1 (fully public), all effective safety = Σ s_j
         for e in eff:
-            assert e == pytest.approx(s_avg, abs=1e-10)
+            assert e == pytest.approx(s_sum, abs=1e-10)
 
     def test_delta_interpolates_monotonically(self) -> None:
         """Effective safety spread decreases monotonically as δ goes from 0 to 1."""
@@ -98,6 +97,46 @@ class TestDeltaConvention:
         spreads = [_effective_spread(s_all, d) for d in deltas]
         for i in range(len(spreads) - 1):
             assert spreads[i] >= spreads[i + 1] - 1e-10
+
+    def test_effective_safety_monotone_in_delta(self) -> None:
+        """Every lab's effective safety increases with δ (for fixed strategies)."""
+        s_all = [0.025, 0.055, 0.066, 0.082, 0.250]
+        deltas = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        prev_eff = primitives._effective_safety(s_all, 0.0)
+        for d in deltas[1:]:
+            eff = primitives._effective_safety(s_all, d)
+            for j in range(len(s_all)):
+                assert eff[j] >= prev_eff[j] - 1e-10, (
+                    f"Lab {j} eff safety decreased: {prev_eff[j]:.6f} -> {eff[j]:.6f} at δ={d}"
+                )
+            prev_eff = eff
+
+    def test_alignment_prob_monotone_in_delta_at_nash(self) -> None:
+        """Every lab's P(aligned) at Nash equilibrium increases with δ."""
+        from report import defaults
+
+        deltas = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        prev_probs = None
+        for d in deltas:
+            s_star = primitives.full_model_nash(
+                R=defaults.R,
+                A=defaults.A,
+                k=defaults.K,
+                alpha=defaults.ALPHA,
+                w=defaults.W,
+                z=defaults.Z,
+                delta=d if d > 0 else None,
+                rho=defaults.RHO,
+            )
+            eff_s = primitives._effective_safety(s_star, d if d > 0 else None)
+            probs = [primitives.alignment_prob(e, defaults.K, defaults.ALPHA) for e in eff_s]
+            if prev_probs is not None:
+                for j in range(len(probs)):
+                    assert probs[j] >= prev_probs[j] - 1e-6, (
+                        f"Lab {j} P(aligned) decreased: {prev_probs[j]:.6f} -> {probs[j]:.6f} "
+                        f"at δ={d}"
+                    )
+            prev_probs = probs
 
 
 def _effective_spread(s_all: list[float], delta: float) -> float:

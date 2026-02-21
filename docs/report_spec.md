@@ -37,7 +37,7 @@ We assume there is no cooperation, and labs maximize expected utility, so we wan
 - $k$, $\epsilon$: set them such that 1% spending -> 20% misalignment, 50% spending -> 2% misalignment. Doesn't make sense to vary because these are different worldviews.
 - $\delta$: 0.5 by default, range [0, 0.75]
 - $r$: 0.5 by default, range [0, 1]
-- $z$: 1 by default, range [0.5, 1]
+- $z$: 0.9 by default, range [0.5, 1]
 
 ### Interpretion of resources and competition
 
@@ -56,7 +56,7 @@ The `report.ipynb` should be an internal report with the following sections:
   - Plot: as in `initial_post.md`
   - Explanation of closed form, including `1 − √(n(n−1)/k)` with n actors. Explain that misalignment probability only decreases with k.
   - Briefly mention the closed form with n actors and general $w$, and how winner-take-all dynamics.
-  - TODO specify additional plots
+  - Plot: asymmetric resources (2 players), safety spending and joint survival vs resource ratio. X-axis from 0.5 to 1.
 - "Full model" section explaining the model above
   - Explain that "Survival probability" can be instead interpreted as "expected human share" in multipolar post-ASI futures.
   - Plot for outcomes vs k, with default value of $\epsilon$ and all other params
@@ -95,3 +95,5 @@ The post will be based on the internal report, It will have a similar structure 
 - Model Description has a subsection synthesizing Claude's and the human's parameter choices.
 
 ## Implementation details
+
+- The tolerance in the Nash solver should be at MOST 1e-5 globally except for 
