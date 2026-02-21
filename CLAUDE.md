@@ -18,7 +18,7 @@ Agents working on separate PRs should be in separate worktrees. For a project `~
 
 ## Code Quality Standards
 
-- No code duplication; type hints everywhere; `ruff format` (line length 100); `ruff check` for linting.
+- No code duplication; type hints everywhere; `uv run ruff format` (line length 100); `uv run ruff check` for linting.
 - Concise one-line docstrings preferred; comments explain WHY not WHAT.
 - Private functions use leading underscore; import modules not functions (Google style).
 - No circular dependencies; higher-level modules depend on lower-level.
@@ -63,12 +63,12 @@ Before adding a comment, ask: "Can I make this code self-explanatory instead?"
 ## Development Commands
 
 ```bash
-ruff format .          # Format
-ruff check .           # Lint
-pytest tests/ -n auto  # Run tests (parallel)
+uv run ruff format .          # Format
+uv run ruff check .           # Lint
+uv run pytest tests/ -n auto  # Run tests (parallel)
 ```
 
 ## Before Returning to User (Critical)
 
-- Must run: `ruff format .`, `ruff check .`, `pytest tests/`
+- Must run: `uv run ruff format .`, `uv run ruff check .`, `uv run pytest tests/`
 - Never say "done" without running these first.

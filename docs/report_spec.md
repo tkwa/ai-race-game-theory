@@ -85,6 +85,7 @@ There should also be the following appendices:
 - A writeup of methodology behind Claude's parameter choices
 - When is computing the Nash equilibrium easy? Pull from subreport `closed_forms.md`
 - Why Gaussian copula and what would a different copula change? By default just write what Claude is confident about without experiments, but could execute `plans/copula.md` in the future.
+- Whether labs should merge. In particular, in this model with w > 1, is it always in their interest for labs to merge, and is this a commonly known result?
 
 All plots should be saved to files in `plots/` so that the human can reference them in the post `README.md`.
 
