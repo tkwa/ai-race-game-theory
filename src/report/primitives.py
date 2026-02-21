@@ -11,15 +11,15 @@ DEFAULT_K = 33.9
 DEFAULT_ALPHA = 0.466
 
 
-def alignment_prob(s: float, k: float, alpha: float = 1.0) -> float:
-    """P(aligned) = k·s^α / (k·s^α + (1-s)), with safety elasticity α."""
+def alignment_prob(s: float, k: float, alpha: float = 1.0, c: float | None = None) -> float:
+    """P(aligned) = k·S^α / (k·S^α + c), where S is effective safety and c is raw capability."""
     if s <= 0:
         return 0.0
-    if s >= 1:
+    cap = (1.0 - s) if c is None else c
+    if cap <= 0:
         return 1.0
-    c = 1.0 - s
     ks_alpha = k * s**alpha
-    return ks_alpha / (ks_alpha + c)
+    return ks_alpha / (ks_alpha + cap)
 
 
 def symmetric_nash(
@@ -45,8 +45,8 @@ def symmetric_nash(
                 eff_i = s_i
                 eff_j = s_j
 
-            p_i = alignment_prob(eff_i, k, alpha)
-            p_j = alignment_prob(eff_j, k, alpha)
+            p_i = alignment_prob(eff_i, k, alpha, c=1.0 - s_i)
+            p_j = alignment_prob(eff_j, k, alpha, c=1.0 - s_j)
 
             # Joint survival
             if correlation > 0 and n >= 2:
@@ -251,7 +251,7 @@ def full_model_payoffs(
     """Compute expected payoff for each lab under the full Ω model."""
     n = len(s_all)
     eff_s = _effective_safety(s_all, delta)
-    probs = np.array([alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    probs = np.array([alignment_prob(eff_s[j], k, alpha, c=1.0 - s_all[j]) for j in range(n)])
     if override_probs:
         for idx, p in override_probs.items():
             probs[idx] = p
@@ -286,7 +286,7 @@ def expected_human_share(
     """Expected fraction of universe controlled by aligned AI."""
     n = len(s_all)
     eff_s = _effective_safety(s_all, delta)
-    probs = np.array([alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    probs = np.array([alignment_prob(eff_s[j], k, alpha, c=1.0 - s_all[j]) for j in range(n)])
     abs_cap = np.array([R[j] * max(1.0 - s_all[j], 1e-15) for j in range(n)])
 
     outcome_probs = _outcome_probabilities(probs, rho)
@@ -323,8 +323,9 @@ def full_model_nash(
         for idx, val in fixed.items():
             s_all[idx] = val
     damping = 0.7
+    prev_change = float("inf")
 
-    for iteration in range(1000):
+    for iteration in range(2000):
         s_prev = list(s_all)
         for i in range(n):
             if fixed and i in fixed:
@@ -348,7 +349,13 @@ def full_model_nash(
         max_change = max(abs(s_all[j] - s_prev[j]) for j in range(n))
         if max_change < 5e-6:
             break
+        # Increase damping if oscillating (change not decreasing)
+        if max_change > prev_change * 0.95 and damping < 0.98:
+            damping = min(0.98, damping + 0.01)
+        prev_change = max_change
     else:
-        raise RuntimeError("full_model_nash did not converge after 1000 iterations")
+        raise RuntimeError(
+            f"full_model_nash did not converge after 2000 iterations (max_change={prev_change:.2e})"
+        )
 
     return s_all

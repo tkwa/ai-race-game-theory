@@ -7,7 +7,7 @@ from report import defaults, primitives
 
 def default_outcomes_vs_k() -> dict:
     """Nash equilibrium and expected human share vs k for the full 5-lab model."""
-    k_values = np.geomspace(0.05, 200, 50)
+    k_values = np.geomspace(0.6, 200, 50)
     results: dict[str, list] = {
         "k": [],
         "s_star": [],
@@ -56,7 +56,10 @@ def default_lab_summary() -> dict:
     )
     n = len(s_star)
     eff_s = primitives._effective_safety(s_star, defaults.DELTA)
-    p_aligned = [primitives.alignment_prob(eff_s[j], defaults.K, defaults.ALPHA) for j in range(n)]
+    p_aligned = [
+        primitives.alignment_prob(eff_s[j], defaults.K, defaults.ALPHA, c=1.0 - s_star[j])
+        for j in range(n)
+    ]
     abs_cap = np.array([defaults.R[j] * (1.0 - s_star[j]) for j in range(n)])
     cap_w = abs_cap**defaults.W
     omega_shares = cap_w / cap_w.sum()

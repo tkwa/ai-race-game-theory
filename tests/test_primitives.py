@@ -29,8 +29,69 @@ class TestAlignmentProb:
     def test_boundary_zero(self) -> None:
         assert primitives.alignment_prob(0.0, 10.0, 0.5) == 0.0
 
-    def test_boundary_one(self) -> None:
+    def test_boundary_one_no_capabilities(self) -> None:
+        """P=1 only when c=0 (no capabilities at all)."""
         assert primitives.alignment_prob(1.0, 10.0, 0.5) == 1.0
+        assert primitives.alignment_prob(1.0, 10.0, 0.5, c=0.0) == 1.0
+
+    def test_strict_range(self) -> None:
+        """P is strictly in (0, 1) for any s > 0 and c > 0."""
+        for s in [0.001, 0.01, 0.5, 0.99, 1.5, 10.0]:
+            for k in [0.01, 1.0, 100.0]:
+                for c in [0.001, 0.5, 0.99]:
+                    p = primitives.alignment_prob(s, k, 0.466, c=c)
+                    assert 0 < p < 1, f"P={p} not in (0,1) for s={s}, k={k}, c={c}"
+
+    def test_monotone_in_safety(self) -> None:
+        """Higher effective safety → higher P, holding c fixed."""
+        c = 0.5
+        prev_p = 0.0
+        for s in [0.01, 0.1, 0.3, 0.5, 1.0, 2.0, 5.0]:
+            p = primitives.alignment_prob(s, 10.0, 0.466, c=c)
+            assert p > prev_p, f"Not monotone: P({s})={p} <= P(prev)={prev_p}"
+            prev_p = p
+
+    def test_monotone_in_capability(self) -> None:
+        """Higher capability → lower P, holding S fixed."""
+        s = 0.3
+        prev_p = 1.0
+        for c in [0.01, 0.1, 0.3, 0.5, 0.9]:
+            p = primitives.alignment_prob(s, 10.0, 0.466, c=c)
+            assert p < prev_p, f"Not monotone in c: P(c={c})={p} >= {prev_p}"
+            prev_p = p
+
+    def test_monotone_in_k(self) -> None:
+        """Higher k → higher P."""
+        prev_p = 0.0
+        for k in [0.01, 0.1, 1.0, 10.0, 100.0]:
+            p = primitives.alignment_prob(0.3, k, 0.466)
+            assert p > prev_p, f"Not monotone in k: P(k={k})={p} <= {prev_p}"
+            prev_p = p
+
+    def test_public_good_separation(self) -> None:
+        """With public good (eff_s > s), passing c explicitly gives higher P."""
+        s = 0.1
+        eff_s = 0.3  # boosted by public good
+        k, alpha = primitives.DEFAULT_K, primitives.DEFAULT_ALPHA
+        p_no_boost = primitives.alignment_prob(s, k, alpha)
+        p_with_boost = primitives.alignment_prob(eff_s, k, alpha, c=1.0 - s)
+        assert p_with_boost > p_no_boost
+        assert p_with_boost < 1.0
+
+    def test_bounded_away_from_1_for_large_s(self) -> None:
+        """Even S=100 shouldn't give P=1 when c > 0."""
+        for c in [0.5, 0.1, 0.01]:
+            p = primitives.alignment_prob(100.0, 33.9, 0.466, c=c)
+            assert p < 1.0, f"P={p} should be <1 for c={c}"
+
+    def test_concave_in_s_for_alpha_below_1(self) -> None:
+        """α < 1 gives diminishing returns (concave) in s."""
+        k, alpha = primitives.DEFAULT_K, primitives.DEFAULT_ALPHA
+        s_vals = [0.05, 0.10, 0.15]
+        p_vals = [primitives.alignment_prob(s, k, alpha) for s in s_vals]
+        # Concavity: P(mid) > midpoint of P(lo) and P(hi)
+        midpoint = (p_vals[0] + p_vals[2]) / 2
+        assert p_vals[1] > midpoint
 
 
 class TestSymmetricNash:
@@ -77,7 +138,7 @@ class TestDeltaConvention:
         p_priv = primitives.alignment_prob(s_private, k, alpha)
         # With s_sum formula, eff_s = (n*s)^δ * s^(1-δ) = n^δ * s, so δ helps
         eff_pub = (n * s_public) ** 0.5 * s_public**0.5
-        p_pub = primitives.alignment_prob(eff_pub, k, alpha)
+        p_pub = primitives.alignment_prob(eff_pub, k, alpha, c=1.0 - s_public)
 
         assert p_pub**n > p_priv**n
 
@@ -129,7 +190,10 @@ class TestDeltaConvention:
                 rho=defaults.RHO,
             )
             eff_s = primitives._effective_safety(s_star, d if d > 0 else None)
-            probs = [primitives.alignment_prob(e, defaults.K, defaults.ALPHA) for e in eff_s]
+            probs = [
+                primitives.alignment_prob(e, defaults.K, defaults.ALPHA, c=1.0 - s_star[j])
+                for j, e in enumerate(eff_s)
+            ]
             if prev_probs is not None:
                 for j in range(len(probs)):
                     assert probs[j] >= prev_probs[j] - 1e-6, (

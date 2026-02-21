@@ -19,7 +19,9 @@ def expected_human_share_with_overrides(
     """Like expected_human_share but with forced alignment probs for specific labs."""
     n = len(s_all)
     eff_s = primitives._effective_safety(s_all, delta)
-    probs = np.array([primitives.alignment_prob(eff_s[j], k, alpha) for j in range(n)])
+    probs = np.array(
+        [primitives.alignment_prob(eff_s[j], k, alpha, c=1.0 - s_all[j]) for j in range(n)]
+    )
 
     if override_probs:
         for idx, p in override_probs.items():

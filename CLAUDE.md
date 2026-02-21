@@ -6,7 +6,7 @@ Game-theoretic model of AI safety race dynamics between competing nations.
 
 
 - `docs/` - Model descriptions and write-ups
-  - `docs/report_spec.md` contains the spec that the report should follow, including the model definition.
+  - `docs/report_spec.md` contains the mostly-human-written spec that the report should follow, including the model definition. This should always be kept up to date with the report. If Claude makes a change to the report due to the human's request that contradicts the current spec wording, the spec should be updated; if this is a major change the human should be asked for approval.
 - `README.md` - Will ultimately be the external output of this project, a blog post.
 - `report.ipynb` - The internal output of this project.
 - `src/report/` - Code used in report.ipynb
