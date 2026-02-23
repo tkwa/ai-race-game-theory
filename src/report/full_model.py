@@ -14,6 +14,7 @@ def default_outcomes_vs_k() -> dict:
         "expected_human_share": [],
     }
 
+    prev_s: list[float] | None = None
     for k in k_values:
         s_star = primitives.full_model_nash(
             R=defaults.R,
@@ -24,6 +25,7 @@ def default_outcomes_vs_k() -> dict:
             z=defaults.Z,
             delta=defaults.DELTA,
             rho=defaults.RHO,
+            initial_guess=prev_s,
         )
         ehs = primitives.expected_human_share(
             s_all=s_star,
@@ -35,6 +37,7 @@ def default_outcomes_vs_k() -> dict:
             delta=defaults.DELTA,
             rho=defaults.RHO,
         )
+        prev_s = s_star
         results["k"].append(float(k))
         results["s_star"].append(s_star)
         results["expected_human_share"].append(ehs)

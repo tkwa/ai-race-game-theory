@@ -35,7 +35,7 @@ We assume there is no cooperation, and labs maximize expected utility, so we wan
 - $A$: For the sensitivity analysis, shrink the off-diagonal entries towards 1 by up to 2x or dilate them away by up to 1.5x (making some negative). The label should be average amity [not counting diagonal ofc]
 - $w$: 2.0 by default, range [1.0, 5.0]
 - $k$, $\epsilon$: set them such that 1% spending -> 20% misalignment, 50% spending -> 2% misalignment. Doesn't make sense to vary because these are different worldviews.
-- $\delta$: 0.5 by default, range [0, 0.75]
+- $\delta$: 0.2 by default, range [0, 0.75]
 - $r$: 0.5 by default, range [0, 1]
 - $z$: 0.9 by default, range [0.5, 1]
 
@@ -97,4 +97,4 @@ The post will be based on the internal report, It will have a similar structure 
 
 ## Implementation details
 
-- The tolerance in the Nash solver should be at MOST 1e-5 globally except for 
+- The tolerance in the Nash solver should be at MOST 1e-5 globally except for k>1 cases

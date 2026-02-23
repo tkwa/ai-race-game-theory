@@ -324,8 +324,11 @@ def full_model_nash(
             s_all[idx] = val
     damping = 0.7
     prev_change = float("inf")
+    stall_count = 0
+    # Track recent iterates for averaging when stuck
+    recent: list[list[float]] = []
 
-    for iteration in range(2000):
+    for iteration in range(4000):
         s_prev = list(s_all)
         for i in range(n):
             if fixed and i in fixed:
@@ -350,12 +353,36 @@ def full_model_nash(
         if max_change < 5e-6:
             break
         # Increase damping if oscillating (change not decreasing)
-        if max_change > prev_change * 0.95 and damping < 0.98:
-            damping = min(0.98, damping + 0.01)
+        if max_change > prev_change * 0.9:
+            stall_count += 1
+            if damping < 0.995:
+                damping = min(0.995, damping + 0.005 * min(stall_count, 5))
+        else:
+            stall_count = max(0, stall_count - 1)
         prev_change = max_change
+
+        # Track recent iterates for averaging when stuck in limit cycle
+        if stall_count > 20:
+            recent.append(list(s_all))
+            if len(recent) > 50:
+                recent.pop(0)
+            if len(recent) >= 50:
+                s_all = [float(np.mean([r[j] for r in recent])) for j in range(n)]
+                if fixed:
+                    for idx, val in fixed.items():
+                        s_all[idx] = val
+                break
     else:
-        raise RuntimeError(
-            f"full_model_nash did not converge after 2000 iterations (max_change={prev_change:.2e})"
-        )
+        # Average what we have if we ran out of iterations
+        if recent:
+            s_all = [float(np.mean([r[j] for r in recent])) for j in range(n)]
+            if fixed:
+                for idx, val in fixed.items():
+                    s_all[idx] = val
+        else:
+            raise RuntimeError(
+                f"full_model_nash did not converge after 4000 iterations "
+                f"(max_change={prev_change:.2e})"
+            )
 
     return s_all

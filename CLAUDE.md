@@ -71,4 +71,5 @@ uv run pytest tests/ -n auto  # Run tests (parallel)
 ## Before Returning to User (Critical)
 
 - Must run: `uv run ruff format .`, `uv run ruff check .`, `uv run pytest tests/`
+- Must ensure the report spec is consistent with the implementation
 - Never say "done" without running these first.
