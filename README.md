@@ -1,6 +1,6 @@
 # ASI Race Game-Theoretic Model
 
-This is a repo meant for understanding the outcome of an AI race. The WIP report is at `report.ipynb`, and the post is still under construction.
+This is a repo meant for understanding the outcome of an AI race. The WIP report is at `report.ipynb`, and the post is still under construction. The [report_spec](docs/report_spec.md) is a succinct explanation of the model.
 
 ## Introduction
 
