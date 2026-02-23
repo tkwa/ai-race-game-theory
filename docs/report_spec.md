@@ -97,4 +97,4 @@ The post will be based on the internal report, It will have a similar structure 
 
 ## Implementation details
 
-- The tolerance in the Nash solver should be at MOST 1e-5 globally except for k>1 cases
+- The tolerance in the Nash solver should be at MOST 1e-5 globally except for k<0.5 cases

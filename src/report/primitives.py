@@ -318,6 +318,7 @@ def full_model_nash(
     override_probs: dict mapping lab index -> forced alignment probability (known to all).
     """
     n = len(R)
+    free_indices = [i for i in range(n) if not (fixed and i in fixed)]
     s_all = list(initial_guess) if initial_guess else [0.3] * n
     if fixed:
         for idx, val in fixed.items():
@@ -325,24 +326,19 @@ def full_model_nash(
     damping = 0.7
     prev_change = float("inf")
     stall_count = 0
-    # Track recent iterates for averaging when stuck
-    recent: list[list[float]] = []
+    tol = 3e-6
 
     for iteration in range(4000):
         s_prev = list(s_all)
-        for i in range(n):
-            if fixed and i in fixed:
-                continue
-
+        for i in free_indices:
             lo = min_safety[i] if (min_safety and i in min_safety) else 1e-10
 
             def neg_payoff(s_i: float, _i: int = i) -> float:
                 s_trial = list(s_all)
                 s_trial[_i] = s_i
-                payoffs = full_model_payoffs(
+                return -full_model_payoffs(
                     s_trial, R, A, k, alpha, w, z, delta, rho, override_probs
-                )
-                return -payoffs[_i]
+                )[_i]
 
             result = optimize.minimize_scalar(
                 neg_payoff, bounds=(lo, 1.0 - 1e-10), method="bounded"
@@ -350,31 +346,37 @@ def full_model_nash(
             s_all[i] = damping * s_prev[i] + (1.0 - damping) * result.x
 
         max_change = max(abs(s_all[j] - s_prev[j]) for j in range(n))
-        if max_change < 5e-6:
+        if max_change < tol:
             break
-        # Increase damping if oscillating (change not decreasing)
-        if max_change > prev_change * 0.9:
+        # Ramp damping only when change genuinely increases (oscillation)
+        if max_change >= prev_change:
             stall_count += 1
             if damping < 0.995:
                 damping = min(0.995, damping + 0.005 * min(stall_count, 5))
         else:
             stall_count = max(0, stall_count - 1)
         prev_change = max_change
-
-        # Track recent iterates for averaging when stuck in limit cycle
-        if stall_count > 20:
-            recent.append(list(s_all))
-            if len(recent) > 50:
-                recent.pop(0)
-            if len(recent) >= 50:
-                s_all = [float(np.mean([r[j] for r in recent])) for j in range(n)]
-                if fixed:
-                    for idx, val in fixed.items():
-                        s_all[idx] = val
-                break
     else:
-        # Average what we have if we ran out of iterations
-        if recent:
+        # Did not converge — average recent iterates to approximate limit cycle center
+        if max_change < 0.1:
+            recent = []
+            for _ in range(100):
+                s_prev = list(s_all)
+                for i in free_indices:
+                    lo = min_safety[i] if (min_safety and i in min_safety) else 1e-10
+
+                    def neg_payoff(s_i: float, _i: int = i) -> float:
+                        s_trial = list(s_all)
+                        s_trial[_i] = s_i
+                        return -full_model_payoffs(
+                            s_trial, R, A, k, alpha, w, z, delta, rho, override_probs
+                        )[_i]
+
+                    result = optimize.minimize_scalar(
+                        neg_payoff, bounds=(lo, 1.0 - 1e-10), method="bounded"
+                    )
+                    s_all[i] = damping * s_prev[i] + (1.0 - damping) * result.x
+                recent.append(list(s_all))
             s_all = [float(np.mean([r[j] for r in recent])) for j in range(n)]
             if fixed:
                 for idx, val in fixed.items():
