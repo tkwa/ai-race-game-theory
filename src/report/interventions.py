@@ -479,36 +479,41 @@ def _compute_all() -> list[tuple[str, float, float]]:
     """Run all interventions and return results."""
     baseline_nash, baseline_ehs = _baseline_nash()
 
+    a = defaults.anonymize_label
     return [
-        ("Remove China", baseline_ehs, _intervention_remove_china()),
-        ("Remove Anthropic", baseline_ehs, _intervention_remove_anthropic()),
-        ("Duplicate every lab", baseline_ehs, _intervention_duplicate_labs()),
+        (a("Remove China"), baseline_ehs, _intervention_remove_china()),
+        (a("Remove Anthropic"), baseline_ehs, _intervention_remove_anthropic()),
+        (a("Duplicate every lab"), baseline_ehs, _intervention_duplicate_labs()),
         (
-            "Secretly make GDM 100% safe",
+            a("Secretly make GDM 100% safe"),
             baseline_ehs,
             _intervention_secretly_safe_gdm(baseline_nash),
         ),
         (
-            "Make GDM 100% safe, tell only them",
+            a("Make GDM 100% safe, tell only them"),
             baseline_ehs,
             _intervention_tell_only_gdm(baseline_nash),
         ),
         (
-            "Make GDM 100% safe, tell everyone",
+            a("Make GDM 100% safe, tell everyone"),
             baseline_ehs,
             _intervention_tell_everyone_gdm_safe(),
         ),
-        ("Double GDM's resources", baseline_ehs, _intervention_double_gdm_resources()),
-        ("Increase amity 10% toward 1", baseline_ehs, _intervention_increase_amity()),
-        ("Make safety a public good (δ=1)", baseline_ehs, _intervention_public_good()),
-        ("Top 3 labs: mutual amity 1", baseline_ehs, _intervention_top3_mutual_amity()),
-        ("Merge top 3 labs", baseline_ehs, _intervention_merge_top3()),
-        ("US→China amity = China→US", baseline_ehs, _intervention_us_china_amity_symmetry()),
+        (a("Double GDM's resources"), baseline_ehs, _intervention_double_gdm_resources()),
+        (a("Increase amity 10% toward 1"), baseline_ehs, _intervention_increase_amity()),
+        (a("Make safety a public good (δ=1)"), baseline_ehs, _intervention_public_good()),
+        (a("Top 3 labs: mutual amity 1"), baseline_ehs, _intervention_top3_mutual_amity()),
+        (a("Merge top 3 labs"), baseline_ehs, _intervention_merge_top3()),
         (
-            "USG demands slowdown (−33% cap)",
+            a("US→China amity = China→US"),
+            baseline_ehs,
+            _intervention_us_china_amity_symmetry(),
+        ),
+        (
+            a("USG demands slowdown (−33% cap)"),
             baseline_ehs,
             _intervention_usg_slowdown(baseline_nash),
         ),
-        ("USG mandates ≥10% safety", baseline_ehs, _intervention_min_safety_10pct()),
-        ("GDM amity → 0 to all others", baseline_ehs, _intervention_gdm_zero_amity()),
+        (a("USG mandates ≥10% safety"), baseline_ehs, _intervention_min_safety_10pct()),
+        (a("GDM amity → 0 to all others"), baseline_ehs, _intervention_gdm_zero_amity()),
     ]

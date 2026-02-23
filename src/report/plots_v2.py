@@ -148,7 +148,7 @@ def plot_full_model_vs_k(data: dict) -> Figure:
     # Bottom: each lab's safety fraction
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
     s_star_matrix = np.array(data["s_star"])  # (n_k, 5)
-    for j, (name, color) in enumerate(zip(defaults.LAB_NAMES, colors)):
+    for j, (name, color) in enumerate(zip(defaults.get_lab_names(), colors)):
         ax_bot.plot(x, s_star_matrix[:, j], color=color, linewidth=1.5, label=name)
     ax_bot.set_ylabel("Safety fraction s*")
     ax_bot.legend(loc="upper right")

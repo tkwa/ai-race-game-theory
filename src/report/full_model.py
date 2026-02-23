@@ -67,7 +67,7 @@ def default_lab_summary() -> dict:
     cap_w = abs_cap**defaults.W
     omega_shares = cap_w / cap_w.sum()
     return {
-        "lab_names": list(defaults.LAB_NAMES),
+        "lab_names": defaults.get_lab_names(),
         "omega_share": omega_shares.tolist(),
         "p_misaligned": [1.0 - p for p in p_aligned],
         "s_star": list(s_star),
